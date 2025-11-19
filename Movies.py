@@ -116,7 +116,7 @@ if "home_select" in query_params:
 DEFAULT_MODEL_PATH = "best_model.pkl"   # <-- Debe contener la instancia ContentRecommender pickleda
 TITLE_COL = "original_title"            # Ajusta si es necesario
 OMDB_API_URL = "https://www.omdbapi.com/"
-OMDB_API_KEY = "3530335c"
+OMDB_API_KEY = "5af5a66d"
 SPECIAL_POSTERS = {
     "inception": "https://m.media-amazon.com/images/M/MV5BMjExMjkwNTQ0Nl5BMl5BanBnXkFtZTcwNTY0OTk1Mw@@._V1_.jpg",
     "the wolverine": "https://monsterzeronj.wordpress.com/wp-content/uploads/2013/12/the_wolverine_posterus.jpg?w=584",
