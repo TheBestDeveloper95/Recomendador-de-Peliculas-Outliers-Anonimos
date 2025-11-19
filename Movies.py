@@ -8,7 +8,7 @@ import re
 import html
 import requests
 from io import BytesIO
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, quote_plus
 
 st.set_page_config(layout="wide", page_title="Recomendador de Películas", initial_sidebar_state="expanded")
 
@@ -354,6 +354,33 @@ def build_home_cards(limit: int = 12, scan_rows: int = 400, avg_col: str | None 
             break
     return cards
 
+def render_clickable_movie_card(container, title: str, poster_url: str | None, primary_caption: str | None = None, secondary_caption: str | None = None, image_height: int = 240):
+    """Renderiza una tarjeta clickeable que reusa la logica de query params para abrir la pelicula."""
+    title_clean = (title or "").strip()
+    if not title_clean:
+        return
+    caption_text = primary_caption or title
+    safe_caption = html.escape(caption_text)
+    query_value = quote_plus(title_clean)
+    link_href = f"?home_select={query_value}"
+    if poster_url:
+        safe_poster = html.escape(poster_url, quote=True)
+        media_block = f'<img src="{safe_poster}" alt="{safe_caption}" style="width:100%; border-radius:8px; height:{image_height}px; object-fit:cover; border:1px solid rgba(255,255,255,0.15);" />'
+    else:
+        media_block = f'<div style="width:100%; height:{image_height}px; border-radius:8px; border:1px dashed rgba(255,255,255,0.4); display:flex; align-items:center; justify-content:center; color:#cfcfcf; font-size:14px;">Sin imagen</div>'
+    secondary_html = ""
+    if secondary_caption:
+        secondary_html = f'<div style="margin-top:3px; font-size:12px; color:#cfcfcf;">{html.escape(secondary_caption)}</div>'
+    container.markdown(
+        f"""
+        <a href="{link_href}" target="_self" style="text-decoration:none; display:block; text-align:center;">
+            {media_block}
+            <div style="margin-top:6px; text-align:center; font-weight:600; color:#f5f5f5;">{safe_caption}</div>
+            {secondary_html}
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ---------------------
@@ -422,19 +449,11 @@ if not show_search and not show_top_n:
         for start in range(0, len(home_cards), chunk_size):
             cols = st.columns(min(chunk_size, len(home_cards) - start))
             for col, (card_title, card_poster) in zip(cols, home_cards[start:start + chunk_size]):
-                safe_title = html.escape(card_title)
-                safe_value = html.escape(card_title, quote=True)
-                col.markdown(
-                    f"""
-                    <form method="get" style="text-align:center;">
-                        <input type="hidden" name="home_select" value="{safe_value}" />
-                        <button type="submit" style="background:none;border:none;padding:0;cursor:pointer;width:100%;">
-                            <img src="{card_poster}" alt="{safe_title}" style="width:100%; border-radius:8px; height:240px; object-fit:cover; border:1px solid rgba(255,255,255,0.15);" />
-                            <div style="margin-top:6px; text-align:center; font-weight:600; color:#f5f5f5;">{safe_title}</div>
-                        </button>
-                    </form>
-                    """,
-                    unsafe_allow_html=True,
+                render_clickable_movie_card(
+                    col,
+                    card_title,
+                    poster_url=card_poster,
+                    primary_caption=card_title,
                 )
     else:
         st.info("No se encontraron portadas para mostrar en el inicio.")
@@ -540,12 +559,12 @@ if show_search:
             for col, rec_title in zip(cols, batch):
                 rec_row = get_item_row_by_title(rec_title)
                 rec_poster = resolve_poster_url(rec_title, rec_row)
-                with col:
-                    if rec_poster:
-                        col.image(rec_poster, use_container_width=True)
-                    else:
-                        col.write("Sin imagen")
-                    col.caption(rec_title)
+                render_clickable_movie_card(
+                    col,
+                    rec_title,
+                    poster_url=rec_poster,
+                    primary_caption=rec_title,
+                )
 
     # Mostrar tabla de recomendaciones
     st.subheader(f"Recomendaciones para: {chosen}")
@@ -604,14 +623,15 @@ if show_top_n:
                 row = get_item_row_by_title(top_title)
                 poster_row = row if row is not None else match_row
                 poster = resolve_poster_url(top_title, poster_row)
-                with col:
-                    if poster:
-                        col.image(poster, use_container_width=True)
-                    else:
-                        col.write("Sin imagen")
-                    col.markdown(f"**{top_title}**")
-                    avg_val = match_row.get(AVG_COL) if match_row is not None and AVG_COL in match_row.index else None
-                    col.caption(f"Calificación: {_format_detail_value('avg_vote', avg_val)}")
+                avg_val = match_row.get(AVG_COL) if match_row is not None and AVG_COL in match_row.index else None
+                rating_caption = f"Calificacion: {_format_detail_value('avg_vote', avg_val)}"
+                render_clickable_movie_card(
+                    col,
+                    top_title,
+                    poster_url=poster,
+                    primary_caption=top_title,
+                    secondary_caption=rating_caption,
+                )
 
         cols_show = [title_col, AVG_COL, VOTES_COL]
         cols_show = [c for c in cols_show if c in top_results.columns]
